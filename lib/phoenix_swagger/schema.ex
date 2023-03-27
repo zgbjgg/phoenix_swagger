@@ -39,7 +39,7 @@ defmodule PhoenixSwagger.Schema do
     :additionalProperties,
     :discriminator,
     :example,
-    :"x-nullable"
+    :nullable
   ]
 
   @doc """
@@ -197,7 +197,7 @@ defmodule PhoenixSwagger.Schema do
     property_schema = struct!(type, [description: type.description || description] ++ opts)
 
     property_schema =
-      if nullable?, do: %{property_schema | :"x-nullable" => true}, else: property_schema
+      if nullable?, do: %{property_schema | :nullable => true}, else: property_schema
 
     properties = (model.properties || %{}) |> Map.put(name, property_schema)
     model = %{model | properties: properties}
@@ -801,6 +801,6 @@ defmodule PhoenixSwagger.Schema do
   @spec nullable(%Schema{}, maybe_boolean) :: %Schema{}
         when maybe_boolean: true | false | nil
   def nullable(model = %Schema{}, value) when value in [true, false, nil] do
-    %{model | "x-nullable": value}
+    %{model | nullable: value}
   end
 end

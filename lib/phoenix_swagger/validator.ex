@@ -168,6 +168,7 @@ defmodule PhoenixSwagger.Validator do
 
           schema_object = schema_object
             |> Map.update("definitions", %{}, &swagger_nullable_to_json_schema/1)
+            |> Map.update("properties", %{}, &swagger_nullable_to_json_schema/1)
 
           resolved_schema = ExJsonSchema.Schema.resolve(schema_object)
           :ets.insert(@table, {path, schema["basePath"], resolved_schema})
@@ -181,16 +182,16 @@ defmodule PhoenixSwagger.Validator do
   # Swagger 2.0 and JSON-Schema differ in the treatment of nulls.
   # When the "x-nullable" vendor extension is present in the swagger,
   # convert the type to an array including "null"
-  defp swagger_nullable_to_json_schema(schema = %{"type" => type, "x-nullable" => true})
+  defp swagger_nullable_to_json_schema(schema = %{"type" => type, "nullable" => true})
        when is_binary(type) do
     schema = %{schema | "type" => [type, "null"]}
     swagger_nullable_to_json_schema(schema)
   end
 
-  defp swagger_nullable_to_json_schema(schema = %{"$ref" => ref, "x-nullable" => true})
+  defp swagger_nullable_to_json_schema(schema = %{"$ref" => ref, "nullable" => true})
        when is_binary(ref) do
     schema = schema
-      |> Map.drop(["$ref", "x-nullable"])
+      |> Map.drop(["$ref", "nullable"])
       |> Map.put("oneOf", [%{"type" => "null"}, %{"$ref" => ref}])
 
     swagger_nullable_to_json_schema(schema)
@@ -210,15 +211,37 @@ defmodule PhoenixSwagger.Validator do
 
   @doc false
   defp collect_properties(properties, parameter) when properties == %{} do
+    parameter_attrs =
+      parameter
+      |> Map.get("nullable", false)
+      |> case do
+        true ->
+          %{"type" => [parameter["type"], "null"], "nullable" => true}
+
+        false ->
+          %{"type" => parameter["type"]}
+      end
+
     Map.put(
       %{},
       "properties",
-      Map.put_new(%{}, parameter["name"], %{"type" => parameter["type"]})
+      Map.put_new(%{}, parameter["name"], parameter_attrs)
     )
   end
 
   defp collect_properties(properties, parameter) do
-    props = Map.put(properties["properties"], parameter["name"], %{"type" => parameter["type"]})
+    parameter_attrs =
+      parameter
+      |> Map.get("nullable", false)
+      |> case do
+        true ->
+          %{"type" => [parameter["type"], "null"], "nullable" => true}
+
+        false ->
+          %{"type" => parameter["type"]}
+      end
+
+    props = Map.put(properties["properties"], parameter["name"], parameter_attrs)
     Map.put(properties, "properties", props)
   end
 
